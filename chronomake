@@ -233,7 +233,10 @@ shift $(( OPTIND - 1 ))
 # ------------------------------------------------------------------------------
 
 # get output directory
-readonly TARGETDIR=$(chronocfg -d 2>"/dev/null")
+TARGETDIR=$(chronocfg -d 2>"/dev/null")
+
+# assert trailing slash
+TARGETDIR=$(sed -re "s|.+|&/| ; s|//$|/|" <<< "$TARGETDIR")
 
 # check return value
 if [ -z "$TARGETDIR" ] ; then
@@ -265,102 +268,82 @@ if [ ! -d "$TARGETDIR" ] ; then
 
 fi
 
-# set newest filename
+# set output filename
+readonly INDEXFILE="${TARGETDIR}index.html"
+
+# set sentinel filename
 readonly SENTINEL="$(chrononext "$TARGETDIR").body"
 
-# create newest chrono file in this directory
+# create sentinel as newest chrono file in this directory
 touch "$SENTINEL"
 
 # remove sentinel file on exit
 trap 'rm -f "$SENTINEL"' EXIT
 
-# start html file
-echo "<!DOCTYPE html>"
-echo "<html lang=\"de\">"
-echo "<head>"
-echo "<meta charset=\"UTF-8\">"
-echo "<title>chronomake $(date "+%Y-%m-%d %H:%M:%S")</title>"
-echo "</head>"
-echo "<body>"
+# redirect entire group
+{
 
-# inside or outside <$LISTTAG> tag
-INSIDE=0
+  # start html file
+  echo "<!DOCTYPE html>"
+  echo "<html lang=\"de\">"
+  echo "<head>"
+  echo "<meta charset=\"UTF-8\">"
+  echo "<title>chronomake $(date "+%Y-%m-%d %H:%M:%S")</title>"
+  echo "</head>"
+  echo "<body>"
 
-# find chrono files
-find "$TARGETDIR"                            \
-     -type "f"                               \
-     -regextype "posix-extended"             \
-     -regex "[^$MYIFS]+/chrono-[^$MYIFS/]+$" \
-     -print0                                 \
-| sort --zero-terminated                     \
-| sed --quiet                                \
-      --null-data                            \
-      --regexp-extended                      \
-      --expression="
+  # inside or outside <$LISTTAG> tag
+  INSIDE=0
 
-        # replace last slash with MYIFS
-        s|(.+)/([^/]+)|\1$MYIFS\2| ; T
+  # find chrono files
+  find "$TARGETDIR"                            \
+       -type "f"                               \
+       -regextype "posix-extended"             \
+       -regex "[^$MYIFS]+/chrono-[^$MYIFS/]+$" \
+       -print0                                 \
+  | sort --zero-terminated                     \
+  | sed --quiet                                \
+        --null-data                            \
+        --regexp-extended                      \
+        --expression="
 
-        # replace last dot with MYIFS
-        s|(.+$MYIFS[^\.].*)\.([^\.]+)|\1$MYIFS\2| ; T
+          # replace last slash with MYIFS
+          s|(.+)/([^/]+)|\1$MYIFS\2| ; T
 
-        # print split filename
-        p
+          # replace last dot with MYIFS
+          s|(.+$MYIFS[^\.].*)\.([^\.]+)|\1$MYIFS\2| ; T
 
-      " \
-| while IFS=$MYIFS read -r -d $'\0' DIR TTL EXT
-do
+          # print split filename
+          p
 
-  # list items
-  if [ "$EXT" == "item" ] || [ "$EXT" == "link" ] ; then
+        " \
+  | while IFS=$MYIFS read -r -d $'\0' DIR TTL EXT
+  do
 
-    # check list flag
-    if [ "$INSIDE" == "0" ] ; then
+    # list items
+    if [ "$EXT" == "item" ] || [ "$EXT" == "link" ] ; then
 
-      # start list
-      echo "<$LISTTAG>"
+      # check list flag
+      if [ "$INSIDE" == "0" ] ; then
 
-      # update flag
-      INSIDE=1
+        # start list
+        echo "<$LISTTAG>"
 
-    fi
+        # update flag
+        INSIDE=1
 
-    # distinguish extension
-    case "$EXT" in
+      fi
 
-      "item") show_tag "li" "$DIR/$TTL.$EXT" ;;
-      "link") show_link "$DIR/$TTL.$EXT" ;;
+      # distinguish extension
+      case "$EXT" in
 
-    esac
+        "item") show_tag "li" "$DIR/$TTL.$EXT" ;;
+        "link") show_link "$DIR/$TTL.$EXT" ;;
 
-  # other elements
-  else
+      esac
 
-    # check list flag
-    if [ "$INSIDE" == "1" ] ; then
-
-      # close list
-      echo "</$LISTTAG>"
-
-      # update flag
-      INSIDE=0
-
-    fi
-
-    # image found
-    if [ "$EXT" == "png" ] ; then
-
-      # show image tag
-      echo "<p><img src=\"$DIR/$TTL.$EXT\" alt=\"$TTL\" /></p>"
-
-    # heading found
-    elif [ "$EXT" == "h1" ] ; then
-
-      # show h1 tag
-      show_tag "h1" "$DIR/$TTL.$EXT"
-
-    # sentinel found
-    elif [ "$EXT" == "body" ] ; then
+    # other elements
+    else
 
       # check list flag
       if [ "$INSIDE" == "1" ] ; then
@@ -373,18 +356,60 @@ do
 
       fi
 
-      # stop reading more files
-      break
+      # image found
+      if [ "$EXT" == "png" ] ; then
+
+        # show image tag
+        echo "<p><img src=\"$DIR/$TTL.$EXT\" alt=\"$TTL\" /></p>"
+
+      # heading found
+      elif [ "$EXT" == "h1" ] ; then
+
+        # show h1 tag
+        show_tag "h1" "$DIR/$TTL.$EXT"
+
+      # sentinel found
+      elif [ "$EXT" == "body" ] ; then
+
+        # check list flag
+        if [ "$INSIDE" == "1" ] ; then
+
+          # close list
+          echo "</$LISTTAG>"
+
+          # update flag
+          INSIDE=0
+
+        fi
+
+        # stop reading more files
+        break
+
+      fi
 
     fi
 
-  fi
+  done
 
-done
+  # finish html file
+  echo "</body>"
+  echo "</html>"
 
-# finish html file
-echo "</body>"
-echo "</html>"
+} > "$INDEXFILE"
+
+# check file size
+if [ ! -s "$INDEXFILE" ] ; then
+
+  # notify user
+  failmsg "unable to create index file: \"$INDEXFILE\""
+
+  # signalize trouble
+  exit 1
+
+fi
+
+# notify user
+donemsg "file created: $INDEXFILE"
 
 # signalize success
 exit 0
