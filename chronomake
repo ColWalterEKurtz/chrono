@@ -326,15 +326,12 @@ do
     fi
 
     # distinguish extension
-    if [ "$EXT" == "item" ] ; then
+    case "$EXT" in
 
-      show_tag "li" "$DIR/$TTL.$EXT"
+      "item") show_tag "li" "$DIR/$TTL.$EXT" ;;
+      "link") show_link "$DIR/$TTL.$EXT" ;;
 
-    elif [ "$EXT" == "link" ] ; then
-
-      show_link "$DIR/$TTL.$EXT"
-
-    fi
+    esac
 
   # other elements
   else
