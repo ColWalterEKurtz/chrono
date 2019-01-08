@@ -357,10 +357,10 @@ trap 'rm -f "$SENTINEL"' EXIT
       fi
 
       # image found
-      if [ "$EXT" == "png" ] ; then
+      if [ "$EXT" == "png" ] || [ "$EXT" == "jpg" ] ; then
 
         # show image tag
-        echo "<p><img src=\"$DIR/$TTL.$EXT\" alt=\"$TTL\" /></p>"
+        echo "<p><img src=\"$DIR/$TTL.$EXT\" alt=\"no description available\" /></p>"
 
       # heading found
       elif [ "$EXT" == "h1" ] ; then
