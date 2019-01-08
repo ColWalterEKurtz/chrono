@@ -92,7 +92,7 @@ function donemsg()
 #
 function show_config_file()
 {
-  echo "DIR=$HOME/"
+  echo "DIR=$HOME/chrono-out/"
   echo "EDT=leafpad"
   echo "GEO=1600x872+0+0"
   echo "ICN=/usr/share/icons/gnome/scalable/places/folder-pictures-symbolic.svg"
