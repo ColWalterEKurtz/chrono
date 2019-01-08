@@ -138,13 +138,17 @@ OPMODE="DEFAULT"
 NEWVAL=""
 
 # set options to accept
-readonly KNOWN_OPTIONS=":cCdD:eE:gG:iI:"
+readonly KNOWN_OPTIONS=":acCdD:eE:gG:iI:"
 
 # check passed options
 while getopts "$KNOWN_OPTIONS" OPTION "$@"
 do
 
   case "$OPTION" in
+
+    # show entire config file
+    "a") OPMODE="SHOW_CONFIG_FILE"
+         ;;
 
     # create default config file
     "c") OPMODE="CREATE_CONFIG_FILE_IF_MISSING"
@@ -229,6 +233,7 @@ if [ "$OPMODE" == "DEFAULT" ] ; then
   echo "  $(basename "$0") -C  create default config file"
   echo
   echo "GET"
+  echo "  $(basename "$0") -a  show entire config file"
   echo "  $(basename "$0") -d  get output directory"
   echo "  $(basename "$0") -e  get editor"
   echo "  $(basename "$0") -g  get crop geometry"
@@ -243,6 +248,25 @@ if [ "$OPMODE" == "DEFAULT" ] ; then
 
   # signalize trouble
   exit 1
+
+fi
+
+# -a
+if [ "$OPMODE" == "SHOW_CONFIG_FILE" ] ; then
+
+  # check if config file is missing
+  if [ ! -f "$CFGFILE" ] ; then
+
+    # notify user
+    failmsg "unable to locate config file: \"$CFGFILE\""
+
+    # signalize trouble
+    exit 1
+
+  fi
+
+  # show entire file
+  cat "$CFGFILE"
 
 fi
 
