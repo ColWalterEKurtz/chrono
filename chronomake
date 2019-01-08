@@ -283,7 +283,7 @@ echo "<title>chronomake $(date "+%Y-%m-%d %H:%M:%S")</title>"
 echo "</head>"
 echo "<body>"
 
-# inside or outside <ol> tag
+# inside or outside <$LISTTAG> tag
 INSIDE=0
 
 # find chrono files
