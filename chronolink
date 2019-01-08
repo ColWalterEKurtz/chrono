@@ -86,7 +86,7 @@ function donemsg()
 # ------------------------------------------------------------------------------
 
 # get output directory
-readonly TARGETDIR=$(./chronocfg -d 2>"/dev/null")
+readonly TARGETDIR=$(chronocfg -d 2>"/dev/null")
 
 # check return value
 if [ -z "$TARGETDIR" ] ; then
@@ -119,7 +119,7 @@ if [ ! -d "$TARGETDIR" ] ; then
 fi
 
 # get final filename first (timestamp)
-readonly OUTFILE="$(./chrononext "$TARGETDIR").link"
+readonly OUTFILE="$(chrononext "$TARGETDIR").link"
 
 # rdirect entire group
 {
@@ -132,7 +132,7 @@ readonly OUTFILE="$(./chrononext "$TARGETDIR").link"
 } > "$OUTFILE"
 
 # query user
-if ! ./chronoquery "$OUTFILE" ; then
+if ! chronoquery "$OUTFILE" ; then
 
   # query failed
   exit 1

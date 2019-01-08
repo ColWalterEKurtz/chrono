@@ -233,7 +233,7 @@ shift $(( OPTIND - 1 ))
 # ------------------------------------------------------------------------------
 
 # get output directory
-readonly TARGETDIR=$(./chronocfg -d 2>"/dev/null")
+readonly TARGETDIR=$(chronocfg -d 2>"/dev/null")
 
 # check return value
 if [ -z "$TARGETDIR" ] ; then
@@ -266,7 +266,7 @@ if [ ! -d "$TARGETDIR" ] ; then
 fi
 
 # set newest filename
-readonly SENTINEL="$(./chrononext "$TARGETDIR").body"
+readonly SENTINEL="$(chrononext "$TARGETDIR").body"
 
 # create newest chrono file in this directory
 touch "$SENTINEL"

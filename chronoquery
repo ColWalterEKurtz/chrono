@@ -151,7 +151,7 @@ function setup_window()
 readonly OUTFILE="$1"
 
 # get editor
-readonly EDITOR=$(./chronocfg -e 2>"/dev/null")
+readonly EDITOR=$(chronocfg -e 2>"/dev/null")
 
 # check return value
 if [ -z "$EDITOR" ] ; then

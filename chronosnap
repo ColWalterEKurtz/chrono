@@ -128,7 +128,7 @@ function screenshot()
 # ------------------------------------------------------------------------------
 
 # get crop geometry
-readonly GEOMETRY=$(./chronocfg -g 2>"/dev/null")
+readonly GEOMETRY=$(chronocfg -g 2>"/dev/null")
 
 # check return value
 if [ -z "$GEOMETRY" ] ; then
@@ -142,7 +142,7 @@ if [ -z "$GEOMETRY" ] ; then
 fi
 
 # get output directory
-readonly TARGETDIR=$(./chronocfg -d 2>"/dev/null")
+readonly TARGETDIR=$(chronocfg -d 2>"/dev/null")
 
 # check return value
 if [ -z "$TARGETDIR" ] ; then
@@ -175,10 +175,10 @@ if [ ! -d "$TARGETDIR" ] ; then
 fi
 
 # get icon to show via notify-send
-readonly ICON=$(./chronocfg -i)
+readonly ICON=$(chronocfg -i)
 
 # get final filename first (timestamp)
-readonly OUTFILE="$(./chrononext "$TARGETDIR").png"
+readonly OUTFILE="$(chrononext "$TARGETDIR").png"
 
 # create screenshot
 readonly TEMPFILE=$(screenshot "$GEOMETRY")
