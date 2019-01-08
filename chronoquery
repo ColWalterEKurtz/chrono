@@ -1,0 +1,208 @@
+#!/bin/bash
+
+# ------------------------------------------------------------------------------
+# settings                                                              settings
+# ------------------------------------------------------------------------------
+set -o errtrace  # any trap on ERR is inherited by shell functions,
+                 #   command substitutions, and commands executed in a subshell
+                 #   environment
+set -o nounset   # treat unset variables and parameters other than the special
+                 #   parameters "@" and "*" as an error when performing
+                 #   parameter expansion
+set -o pipefail  # the return value of a pipeline is the value of the last
+                 #   (rightmost) command to exit with a non-zero status, or
+                 #   zero if all commands in the pipeline exit successfully
+
+# set language
+export LANG="en_US.UTF-8"
+
+# use dot as decimal separator
+export LC_NUMERIC="en_US.UTF-8"
+
+# terminal colors
+readonly    NONE=$(tput sgr0)
+readonly     RED=$(tput setaf 1)
+readonly   GREEN=$(tput setaf 2)
+readonly  YELLOW=$(tput setaf 3)
+readonly    BLUE=$(tput setaf 4)
+readonly MAGENTA=$(tput setaf 5)
+readonly    CYAN=$(tput setaf 6)
+readonly   WHITE=$(tput setaf 7)
+
+# ------------------------------------------------------------------------------
+# functions                                                            functions
+# ------------------------------------------------------------------------------
+
+# -------
+# failmsg
+# -------
+#
+# This function prints a red colored message via stderr.
+#
+function failmsg()
+{
+  # push to stderr
+  echo -e "${RED}[FAIL]${NONE} $1" 1>&2
+}
+
+# -------
+# warnmsg
+# -------
+#
+# This function prints a yellow colored message via stderr.
+#
+function warnmsg()
+{
+  # push to stderr
+  echo -e "${YELLOW}[WARN]${NONE} $1" 1>&2
+}
+
+# -------
+# infomsg
+# -------
+#
+# This function prints a blue colored message via stderr.
+#
+function infomsg()
+{
+  # push to stderr
+  echo -e "${BLUE}[INFO]${NONE} $1" 1>&2
+}
+
+# -------
+# donemsg
+# -------
+#
+# This function prints a green colored message via stderr.
+#
+function donemsg()
+{
+  # push to stderr
+  echo -e "${GREEN}[DONE]${NONE} $1" 1>&2
+}
+
+# ------------
+# setup_window
+# ------------
+#
+# $1  process ID
+# $2  x offset
+# $3  y offset
+# $4  width
+# $5  height
+# $6  always on top:
+#     0 = NO
+#     1 = YES
+#
+function setup_window()
+{
+  # name positional parameters
+  local readonly PRID="$1"
+  local readonly POSX="$2"
+  local readonly POSY="$3"
+  local readonly WINW="$4"
+  local readonly WINH="$5"
+  local readonly ATOP="$6"
+
+  # reset window ID
+  local WID=""
+
+  # wait for window to be shown
+  while [ -z "$WID" ]
+  do
+
+    # get window ID
+    local WID=$(wmctrl -lp | sed -nre "s/^(0x[[:xdigit:]]+) +[^[:space:]]+ +$PRID .+/\1/p")
+
+  done &>"/dev/null" 
+
+  # disable fullscreen
+  wmctrl -ir "$WID" -b "remove,fullscreen"
+  wmctrl -ir "$WID" -b "remove,maximized_vert"
+  wmctrl -ir "$WID" -b "remove,maximized_horz"
+
+  # move and resize window
+  #   A move and resize argument has the format 'g,x,y,w,h'. All five components
+  #   are integers. The first value, g, is the gravity of the window, with 0
+  #   being the most common value (the default value for the window).
+  #   The four remaining values are a standard geometry specification: x,y is the
+  #   position of the top left corner of the window, and w,h is the width and height
+  #   of the window, with the exception that the value of -1 in any position is
+  #   interpreted to mean that the current geometry value should not be modified.
+  wmctrl -ir "$WID" -e "0,$POSX,$POSY,$WINW,$WINH"
+
+  # check flag
+  if [ "$ATOP" == "1" ] ; then
+
+    # set 'always on top'
+    wmctrl -ir "$WID" -b "add,above"
+
+  fi
+}
+
+# ------------------------------------------------------------------------------
+# commands                                                              commands
+# ------------------------------------------------------------------------------
+
+# check number of arguments
+(( $# != 1 )) && exit 1
+
+# set filename
+readonly OUTFILE="$1"
+
+# get editor
+readonly EDITOR=$(./chronocfg -e 2>"/dev/null")
+
+# check return value
+if [ -z "$EDITOR" ] ; then
+
+  # notify user
+  failmsg "no editor given"
+
+  # signalize trouble
+  exit 1
+
+fi
+
+# get display width and height
+readonly ROOTW=$(xwininfo -root | sed -nre "s/[[:space:]]+Width:[[:space:]]+([[:digit:]]+)[[:space:]]*$/\1/p")
+readonly ROOTH=$(xwininfo -root | sed -nre "s/[[:space:]]+Height:[[:space:]]+([[:digit:]]+)[[:space:]]*$/\1/p")
+
+# calculate window size
+readonly EDTW=$(bc <<< "$ROOTW / 2")
+readonly EDTH=$(bc <<< "$ROOTH / 8")
+readonly EDTX=$(bc <<< "($ROOTW - $EDTW) / 2")
+readonly EDTY=$(bc <<< "($ROOTH - $EDTH) / 2")
+
+# open editor
+{ $EDITOR "$OUTFILE" & } &>"/dev/null"
+
+# get process id
+readonly EDITORID="$!"
+
+# move and resize editor window
+setup_window "$EDITORID" "$EDTX" "$EDTY" "$EDTW" "$EDTH" "1"
+
+# wait for editor to terminate
+wait "$EDITORID"
+
+# reduce white space
+sed --in-place        \
+    --regexp-extended \
+    --expression="
+
+      # skip empty lines
+      /^[[:space:]]*$/ d
+
+      # squeeze and unify white space
+      s/[[:space:]]+/ /g
+
+      # trim lines
+      s/^ //
+      s/ $//
+
+    " "$OUTFILE"
+
+# signalize success
+exit 0
+

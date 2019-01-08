@@ -1,0 +1,394 @@
+#!/bin/bash
+
+# ------------------------------------------------------------------------------
+# settings                                                              settings
+# ------------------------------------------------------------------------------
+#set -o errexit   # exit immediately if a command exits with a non-zero status
+set -o errtrace  # any trap on ERR is inherited by shell functions,
+                 #   command substitutions, and commands executed in a subshell
+                 #   environment
+set -o nounset   # treat unset variables and parameters other than the special
+                 #   parameters "@" and "*" as an error when performing
+                 #   parameter expansion
+set -o pipefail  # the return value of a pipeline is the value of the last
+                 #   (rightmost) command to exit with a non-zero status, or
+                 #   zero if all commands in the pipeline exit successfully
+
+# set language
+export LANG="en_US.UTF-8"
+
+# use dot as decimal separator
+export LC_NUMERIC="en_US.UTF-8"
+
+# terminal colors
+readonly    NONE=$(tput sgr0)
+readonly     RED=$(tput setaf 1)
+readonly   GREEN=$(tput setaf 2)
+readonly  YELLOW=$(tput setaf 3)
+readonly    BLUE=$(tput setaf 4)
+readonly MAGENTA=$(tput setaf 5)
+readonly    CYAN=$(tput setaf 6)
+readonly   WHITE=$(tput setaf 7)
+
+# NULL and this character are not allowed to be used in filenames
+readonly MYIFS=$'\001'
+
+# this kind of list will be generated
+readonly LISTTAG="ul"
+
+# ------------------------------------------------------------------------------
+# functions                                                            functions
+# ------------------------------------------------------------------------------
+
+# -------
+# failmsg
+# -------
+#
+# This function prints a red colored message via stderr.
+#
+function failmsg()
+{
+  # push to stderr
+  echo -e "${RED}[FAIL]${NONE} $1" 1>&2
+}
+
+# -------
+# warnmsg
+# -------
+#
+# This function prints a yellow colored message via stderr.
+#
+function warnmsg()
+{
+  # push to stderr
+  echo -e "${YELLOW}[WARN]${NONE} $1" 1>&2
+}
+
+# -------
+# infomsg
+# -------
+#
+# This function prints a blue colored message via stderr.
+#
+function infomsg()
+{
+  # push to stderr
+  echo -e "${BLUE}[INFO]${NONE} $1" 1>&2
+}
+
+# -------
+# donemsg
+# -------
+#
+# This function prints a green colored message via stderr.
+#
+function donemsg()
+{
+  # push to stderr
+  echo -e "${GREEN}[DONE]${NONE} $1" 1>&2
+}
+
+# --------
+# show_tag
+# --------
+#
+# $1  tag
+# $2  filename
+#
+function show_tag()
+{
+  sed --quiet           \
+      --regexp-extended \
+      --expression="
+
+        # append line to hold buffer
+        H
+
+        # last line found
+        $ {
+
+          # copy hold space to pattern space
+          g
+
+          # squeeze and unify white space
+          s/[[:space:]]+/ /g
+
+          # trim line
+          s/^ //
+          s/ $//
+
+          # replace html syntax characters
+          s/&/\&amp;/g
+          s/</\&lt;/g
+          s/>/\&gt;/g
+          s/\"/\&quot;/g
+          s/'/\&apos;/g
+
+          # add start and end tag
+          s/.+/<$1>&<\/$1>/p
+        }
+      " "$2"
+}
+
+# ---------
+# show_link
+# ---------
+#
+# $1  filename
+#
+function show_link()
+{
+  sed --quiet           \
+      --regexp-extended \
+      --expression="
+
+        # append line to hold buffer
+        H
+
+        # last line found
+        $ {
+
+          # copy hold space to pattern space
+          g
+
+          # reduce pattern space to TEXT tag
+          s/.*\x0ATEXT=([^\x0A]+).*/\1/
+
+          # squeeze and unify white space
+          s/[[:space:]]+/ /g
+
+          # trim line
+          s/^ //
+          s/ $//
+
+          # replace html syntax characters
+          s/&/\&amp;/g
+          s/</\&lt;/g
+          s/>/\&gt;/g
+          s/\"/\&quot;/g
+          s/'/\&apos;/g
+
+          # swap hold and pattern space
+          x
+
+          # start anchor tag with HREF value
+          s/.*\x0AHREF=([^\x0A]+).*/<a href=\"\1\" target=\"_blank\">/
+
+          # append hold space to pattern space
+          G
+
+          # join lines
+          s/\x0A//g
+
+          # add missing tags
+          s/.+/<li>&<\/a><\/li>/p
+        }
+      " "$1"
+}
+
+# ------------------------------------------------------------------------------
+# options                                                                options
+# ------------------------------------------------------------------------------
+
+# set default values
+OPMODE="DEFAULT"
+
+# set options to accept
+readonly KNOWN_OPTIONS=":hv"
+
+# check passed options
+while getopts "$KNOWN_OPTIONS" OPTION "$@"
+do
+
+  case "$OPTION" in
+
+    # show help
+    "h") OPMODE="SHOW_HELP"
+         ;;
+
+    # show version
+    "v") OPMODE="SHOW_VERSION"
+         ;;
+
+    "?") failmsg "unknown option: -$OPTARG"
+         exit 1
+         ;;
+
+    ":") failmsg "missing argument: -$OPTARG <argument>"
+         exit 1
+         ;;
+
+  esac
+
+done
+
+# get number of positional parameters
+PPNUM=$(( $# - OPTIND + 1 ))
+
+# drop all parsed options
+shift $(( OPTIND - 1 ))
+
+# ------------------------------------------------------------------------------
+# commands                                                              commands
+# ------------------------------------------------------------------------------
+
+# get output directory
+readonly TARGETDIR=$(./chronocfg -d 2>"/dev/null")
+
+# check return value
+if [ -z "$TARGETDIR" ] ; then
+
+  # notify user
+  failmsg "no output directory given"
+
+  # signalize trouble
+  exit 1
+
+fi
+
+# check directory
+if [ ! -d "$TARGETDIR" ] ; then
+
+  # try to create target directory
+  mkdir --parents "$TARGETDIR"
+
+  # check if target directory is still missing
+  if [ ! -d "$TARGETDIR" ] ; then
+
+    # notify user
+    failmsg "unable to create directory: \"$TARGETDIR\""
+
+    # signalize trouble
+    exit 1
+
+  fi
+
+fi
+
+# set newest filename
+readonly SENTINEL="$(./chrononext "$TARGETDIR").body"
+
+# create newest chrono file in this directory
+touch "$SENTINEL"
+
+# remove sentinel file on exit
+trap 'rm -f "$SENTINEL"' EXIT
+
+# start html file
+echo "<!DOCTYPE html>"
+echo "<html lang=\"de\">"
+echo "<head>"
+echo "<meta charset=\"UTF-8\">"
+echo "<title>chronomake $(date "+%Y-%m-%d %H:%M:%S")</title>"
+echo "</head>"
+echo "<body>"
+
+# inside or outside <ol> tag
+INSIDE=0
+
+# find chrono files
+find "$TARGETDIR"                            \
+     -type "f"                               \
+     -regextype "posix-extended"             \
+     -regex "[^$MYIFS]+/chrono-[^$MYIFS/]+$" \
+     -print0                                 \
+| sort --zero-terminated                     \
+| sed --quiet                                \
+      --null-data                            \
+      --regexp-extended                      \
+      --expression="
+
+        # replace last slash with MYIFS
+        s|(.+)/([^/]+)|\1$MYIFS\2| ; T
+
+        # replace last dot with MYIFS
+        s|(.+$MYIFS[^\.].*)\.([^\.]+)|\1$MYIFS\2| ; T
+
+        # print split filename
+        p
+
+      " \
+| while IFS=$MYIFS read -r -d $'\0' DIR TTL EXT
+do
+
+  # list items
+  if [ "$EXT" == "item" ] || [ "$EXT" == "link" ] ; then
+
+    # check list flag
+    if [ "$INSIDE" == "0" ] ; then
+
+      # start list
+      echo "<$LISTTAG>"
+
+      # update flag
+      INSIDE=1
+
+    fi
+
+    # distinguish extension
+    if [ "$EXT" == "item" ] ; then
+
+      show_tag "li" "$DIR/$TTL.$EXT"
+
+    elif [ "$EXT" == "link" ] ; then
+
+      show_link "$DIR/$TTL.$EXT"
+
+    fi
+
+  # other elements
+  else
+
+    # check list flag
+    if [ "$INSIDE" == "1" ] ; then
+
+      # close list
+      echo "</$LISTTAG>"
+
+      # update flag
+      INSIDE=0
+
+    fi
+
+    # image found
+    if [ "$EXT" == "png" ] ; then
+
+      # show image tag
+      echo "<p><img src=\"$DIR/$TTL.$EXT\" alt=\"$TTL\" /></p>"
+
+    # heading found
+    elif [ "$EXT" == "h1" ] ; then
+
+      # show h1 tag
+      show_tag "h1" "$DIR/$TTL.$EXT"
+
+    # sentinel found
+    elif [ "$EXT" == "body" ] ; then
+
+      # check list flag
+      if [ "$INSIDE" == "1" ] ; then
+
+        # close list
+        echo "</$LISTTAG>"
+
+        # update flag
+        INSIDE=0
+
+      fi
+
+      # stop reading more files
+      break
+
+    fi
+
+  fi
+
+done
+
+# finish html file
+echo "</body>"
+echo "</html>"
+
+# signalize success
+exit 0
+

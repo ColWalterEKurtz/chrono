@@ -1,0 +1,372 @@
+#!/bin/bash
+
+# ------------------------------------------------------------------------------
+# settings                                                              settings
+# ------------------------------------------------------------------------------
+set -o errtrace  # any trap on ERR is inherited by shell functions,
+                 #   command substitutions, and commands executed in a subshell
+                 #   environment
+set -o nounset   # treat unset variables and parameters other than the special
+                 #   parameters "@" and "*" as an error when performing
+                 #   parameter expansion
+set -o pipefail  # the return value of a pipeline is the value of the last
+                 #   (rightmost) command to exit with a non-zero status, or
+                 #   zero if all commands in the pipeline exit successfully
+
+# set language
+export LANG="en_US.UTF-8"
+
+# use dot as decimal separator
+export LC_NUMERIC="en_US.UTF-8"
+
+# terminal colors
+readonly    NONE=$(tput sgr0)
+readonly     RED=$(tput setaf 1)
+readonly   GREEN=$(tput setaf 2)
+readonly  YELLOW=$(tput setaf 3)
+readonly    BLUE=$(tput setaf 4)
+readonly MAGENTA=$(tput setaf 5)
+readonly    CYAN=$(tput setaf 6)
+readonly   WHITE=$(tput setaf 7)
+
+# set filename of the config file
+readonly CFGFILE="$HOME/.chronocfg"
+
+# ------------------------------------------------------------------------------
+# functions                                                            functions
+# ------------------------------------------------------------------------------
+
+# -------
+# failmsg
+# -------
+#
+# This function prints a red colored message via stderr.
+#
+function failmsg()
+{
+  # push to stderr
+  echo -e "${RED}[FAIL]${NONE} $1" 1>&2
+}
+
+# -------
+# warnmsg
+# -------
+#
+# This function prints a yellow colored message via stderr.
+#
+function warnmsg()
+{
+  # push to stderr
+  echo -e "${YELLOW}[WARN]${NONE} $1" 1>&2
+}
+
+# -------
+# infomsg
+# -------
+#
+# This function prints a blue colored message via stderr.
+#
+function infomsg()
+{
+  # push to stderr
+  echo -e "${BLUE}[INFO]${NONE} $1" 1>&2
+}
+
+# -------
+# donemsg
+# -------
+#
+# This function prints a green colored message via stderr.
+#
+function donemsg()
+{
+  # push to stderr
+  echo -e "${GREEN}[DONE]${NONE} $1" 1>&2
+}
+
+# ----------------
+# show_config_file
+# ----------------
+#
+#
+#
+function show_config_file()
+{
+  echo "DIR=$HOME/"
+  echo "EDT=leafpad"
+  echo "GEO=1600x872+0+0"
+  echo "ICN=/usr/share/icons/gnome/scalable/places/folder-pictures-symbolic.svg"
+}
+
+# ----
+# show
+# ----
+#
+# $1  KEY
+#
+function show()
+{
+  # push first VALUE to stdout
+  sed -nre "s/^$1=(.+)/\1/p ; T ; q" "$CFGFILE"
+}
+
+# ------
+# update
+# ------
+#
+# $1  KEY
+# $2  new VALUE
+#
+function update()
+{
+  # remove current TAG and VALUE
+  sed -i "/^$1=/ d" "$CFGFILE"
+
+  # append new KEY and VALUE
+  sed -i "$ a $1=$2" "$CFGFILE"
+
+  # notify user
+  donemsg "config file updated: $1=$2"
+}
+
+# ------------------------------------------------------------------------------
+# options                                                                options
+# ------------------------------------------------------------------------------
+
+# set default values
+OPMODE="DEFAULT"
+NEWVAL=""
+
+# set options to accept
+readonly KNOWN_OPTIONS=":cCdD:eE:gG:iI:"
+
+# check passed options
+while getopts "$KNOWN_OPTIONS" OPTION "$@"
+do
+
+  case "$OPTION" in
+
+    # create default config file
+    "c") OPMODE="CREATE_CONFIG_FILE_IF_MISSING"
+         ;;
+
+    # create default config file
+    "C") OPMODE="CREATE_CONFIG_FILE"
+         ;;
+
+    # push output directory to stdout
+    "d") OPMODE="GET_OUTPUT_DIR"
+         ;;
+
+    # set output directory
+    "D") NEWVAL="$OPTARG"
+         OPMODE="SET_OUTPUT_DIR"
+         ;;
+
+    # push editor to stdout
+    "e") OPMODE="GET_EDITOR"
+         ;;
+
+    # set editor
+    "E") NEWVAL="$OPTARG"
+         OPMODE="SET_EDITOR"
+         ;;
+
+    # push crop geometry to stdout
+    "g") OPMODE="GET_CROP_GEOMETRY"
+         ;;
+
+    # set crop geometry
+    "G") NEWVAL="$OPTARG"
+         OPMODE="SET_CROP_GEOMETRY"
+         ;;
+
+    # push path of the notification icon to stdout
+    "i") OPMODE="GET_ICON_PATH"
+         ;;
+
+    # set  path of the notification icon
+    "I") NEWVAL="$OPTARG"
+         OPMODE="SET_ICON_PATH"
+         ;;
+
+    "?") failmsg "unknown option: -$OPTARG"
+         exit 1
+         ;;
+
+    ":") failmsg "missing argument: -$OPTARG <argument>"
+         exit 1
+         ;;
+
+  esac
+
+done
+
+# get number of positional parameters
+PPNUM=$(( $# - OPTIND + 1 ))
+
+# check number of positional parameters
+if (( PPNUM > 0 )) ; then
+
+  # notify user
+  failmsg "no positional parameters allowed"
+
+  # signalize trouble
+  exit 1
+
+fi
+
+# ------------------------------------------------------------------------------
+# commands                                                              commands
+# ------------------------------------------------------------------------------
+
+# default
+if [ "$OPMODE" == "DEFAULT" ] ; then
+
+  echo
+  echo "CREATE"
+  echo "  $(basename "$0") -c  create default config file if missing"
+  echo "  $(basename "$0") -C  create default config file"
+  echo
+  echo "GET"
+  echo "  $(basename "$0") -d  get output directory"
+  echo "  $(basename "$0") -e  get editor"
+  echo "  $(basename "$0") -g  get crop geometry"
+  echo "  $(basename "$0") -i  get path of the icon file to show via notify-send"
+  echo
+  echo "SET"
+  echo "  $(basename "$0") -D <dir>            set output directory"
+  echo "  $(basename "$0") -E <cmd>            set editor"
+  echo "  $(basename "$0") -G <w>x<h>+<x>+<y>  set crop geometry"
+  echo "  $(basename "$0") -I <path>           set path of the icon to show via notify-send"
+  echo
+
+  # signalize trouble
+  exit 1
+
+fi
+
+# -c
+if [ "$OPMODE" == "CREATE_CONFIG_FILE_IF_MISSING" ] ; then
+
+  # check if file is missing
+  if [ ! -f "$CFGFILE" ] ; then
+
+    # create default config file
+    show_config_file > "$CFGFILE"
+
+    # check if file is still missing or empty
+    if [ ! -s "$CFGFILE" ] ; then
+
+      # notify user
+      failmsg "unable to create config file: \"$CFGFILE\""
+
+      # signalize trouble
+      exit 1
+
+    fi
+
+    # notify user
+    donemsg "config file created: $CFGFILE"
+
+  else
+
+    # notify user
+    failmsg "config file already exists: $CFGFILE"
+
+    # signalize trouble
+    exit 1
+
+  fi
+
+fi
+
+# -C
+if [ "$OPMODE" == "CREATE_CONFIG_FILE" ] ; then
+
+  # create default config file
+  show_config_file > "$CFGFILE"
+
+  # check if file is still missing or empty
+  if [ ! -s "$CFGFILE" ] ; then
+
+    # notify user
+    failmsg "unable to create config file: \"$CFGFILE\""
+
+    # signalize trouble
+    exit 1
+
+  fi
+
+  # notify user
+  donemsg "config file created: $CFGFILE"
+
+fi
+
+# check if file is missing
+if [ ! -f "$CFGFILE" ] ; then
+
+  # notify user
+  failmsg "unable to locate config file: \"$CFGFILE\""
+
+  # signalize trouble
+  exit 1
+
+fi
+
+# -d
+if [ "$OPMODE" == "GET_OUTPUT_DIR" ] ; then
+
+  # push first DIR value to stdout
+  show "DIR"
+
+# -e
+elif [ "$OPMODE" == "GET_EDITOR" ] ; then
+
+  # push first EDT value to stdout
+  show "EDT"
+
+# -g
+elif [ "$OPMODE" == "GET_CROP_GEOMETRY" ] ; then
+
+  # push first GEO value to stdout
+  show "GEO"
+
+# -i
+elif [ "$OPMODE" == "GET_ICON_PATH" ] ; then
+
+  # push first ICN value to stdout
+  show "ICN"
+
+# -D
+elif [ "$OPMODE" == "SET_OUTPUT_DIR" ] ; then
+
+  # assert trailing slash
+  NEWVAL=$(sed -re "s|.+|&/| ; s|//$|/|" <<< "$NEWVAL")
+
+  # set new value
+  update "DIR" "$NEWVAL"
+
+# -E
+elif [ "$OPMODE" == "SET_EDITOR" ] ; then
+
+  # set new value
+  update "EDT" "$NEWVAL"
+
+# -G
+elif [ "$OPMODE" == "SET_CROP_GEOMETRY" ] ; then
+
+  # set new value
+  update "GEO" "$NEWVAL"
+
+# -I
+elif [ "$OPMODE" == "SET_ICON_PATH" ] ; then
+
+  # set new value
+  update "ICN" "$NEWVAL"
+
+fi
+
+# signalize success
+exit 0
+
