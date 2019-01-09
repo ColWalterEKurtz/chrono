@@ -3,7 +3,6 @@
 # ------------------------------------------------------------------------------
 # settings                                                              settings
 # ------------------------------------------------------------------------------
-#set -o errexit   # exit immediately if a command exits with a non-zero status
 set -o errtrace  # any trap on ERR is inherited by shell functions,
                  #   command substitutions, and commands executed in a subshell
                  #   environment
@@ -218,6 +217,27 @@ function show_link()
       " "$1"
 }
 
+# ---------
+# show_code
+# ---------
+#
+# $1  filename
+#
+function show_code()
+{
+  sed --regexp-extended \
+      --expression="
+
+        # skip empty lines
+        /^[[:space:]]*$/ d
+
+        # remove leading and trailing space
+        #s/^[[:space:]]+//
+        #s/[[:space:]]+$//
+
+      " "$1"
+}
+
 # ------------------------------------------------------------------------------
 # options                                                                options
 # ------------------------------------------------------------------------------
@@ -383,6 +403,12 @@ readonly INDEXFILE="${TARGETDIR}index.html"
 
         # show h1 tag
         show_tag "h1" "$DIR/$TTL.$EXT"
+
+      # html code found
+      elif [ "$EXT" == "code" ] ; then
+
+        # show html code
+        show_code "$DIR/$TTL.$EXT"
 
       fi
 

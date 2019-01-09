@@ -1,0 +1,156 @@
+#!/bin/bash
+
+# ------------------------------------------------------------------------------
+# settings                                                              settings
+# ------------------------------------------------------------------------------
+set -o errtrace  # any trap on ERR is inherited by shell functions,
+                 #   command substitutions, and commands executed in a subshell
+                 #   environment
+set -o nounset   # treat unset variables and parameters other than the special
+                 #   parameters "@" and "*" as an error when performing
+                 #   parameter expansion
+set -o pipefail  # the return value of a pipeline is the value of the last
+                 #   (rightmost) command to exit with a non-zero status, or
+                 #   zero if all commands in the pipeline exit successfully
+
+# set language
+export LANG="en_US.UTF-8"
+
+# use dot as decimal separator
+export LC_NUMERIC="en_US.UTF-8"
+
+# terminal colors
+readonly    NONE=$(tput sgr0)
+readonly     RED=$(tput setaf 1)
+readonly   GREEN=$(tput setaf 2)
+readonly  YELLOW=$(tput setaf 3)
+readonly    BLUE=$(tput setaf 4)
+readonly MAGENTA=$(tput setaf 5)
+readonly    CYAN=$(tput setaf 6)
+readonly   WHITE=$(tput setaf 7)
+
+# ------------------------------------------------------------------------------
+# functions                                                            functions
+# ------------------------------------------------------------------------------
+
+# -------
+# failmsg
+# -------
+#
+# This function prints a red colored message via stderr.
+#
+function failmsg()
+{
+  # push to stderr
+  echo -e "${RED}[FAIL]${NONE} $1" 1>&2
+}
+
+# -------
+# warnmsg
+# -------
+#
+# This function prints a yellow colored message via stderr.
+#
+function warnmsg()
+{
+  # push to stderr
+  echo -e "${YELLOW}[WARN]${NONE} $1" 1>&2
+}
+
+# -------
+# infomsg
+# -------
+#
+# This function prints a blue colored message via stderr.
+#
+function infomsg()
+{
+  # push to stderr
+  echo -e "${BLUE}[INFO]${NONE} $1" 1>&2
+}
+
+# -------
+# donemsg
+# -------
+#
+# This function prints a green colored message via stderr.
+#
+function donemsg()
+{
+  # push to stderr
+  echo -e "${GREEN}[DONE]${NONE} $1" 1>&2
+}
+
+# ------------------------------------------------------------------------------
+# commands                                                              commands
+# ------------------------------------------------------------------------------
+
+# get output directory
+readonly TARGETDIR=$(chronocfg -d 2>"/dev/null")
+
+# check return value
+if [ -z "$TARGETDIR" ] ; then
+
+  # notify user
+  failmsg "no output directory given"
+
+  # signalize trouble
+  exit 1
+
+fi
+
+# check directory
+if [ ! -d "$TARGETDIR" ] ; then
+
+  # try to create target directory
+  mkdir --parents "$TARGETDIR"
+
+  # check if target directory is still missing
+  if [ ! -d "$TARGETDIR" ] ; then
+
+    # notify user
+    failmsg "unable to create directory: \"$TARGETDIR\""
+
+    # signalize trouble
+    exit 1
+
+  fi
+
+fi
+
+# get final filename first (timestamp)
+readonly OUTFILE="$(chrononext "$TARGETDIR").code"
+
+# insert some empty lines
+echo -e "\n\n\n" > "$OUTFILE"
+
+# query user
+if ! chronoquery "$OUTFILE" ; then
+
+  # signalize trouble
+  exit 1
+
+fi
+
+# check filesize
+if [ -s "$OUTFILE" ] ; then
+
+  # show created filename
+  donemsg "file created: $OUTFILE"
+
+else
+
+  # remove empty file
+  rm -f "$OUTFILE"
+
+  # notify user
+  failmsg "no text found"
+
+  # signalize trouble
+  exit 1
+
+fi
+
+# signalize success
+exit 0
+
