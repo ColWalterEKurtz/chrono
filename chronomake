@@ -88,6 +88,38 @@ function donemsg()
   echo -e "${GREEN}[DONE]${NONE} $1" 1>&2
 }
 
+# -----------------
+# find_chrono_files
+# -----------------
+#
+# $1  top directory
+# $2  separator
+#
+function find_chrono_files()
+{
+  find "$1"                            \
+       -type "f"                       \
+       -regextype "posix-extended"     \
+       -regex "[^$2]+/chrono-[^$2/]+$" \
+       -print0                         \
+  | sort --zero-terminated             \
+  | sed --quiet                        \
+        --null-data                    \
+        --regexp-extended              \
+        --expression="
+
+          # replace last slash with separator
+          s|(.+)/([^/]+)|\1$2\2| ; T
+
+          # replace last dot with separator
+          s|(.+$2[^\.].*)\.([^\.]+)|\1$2\2| ; T
+
+          # print split filename
+          p
+
+        "
+}
+
 # --------
 # show_tag
 # --------
@@ -194,7 +226,7 @@ function show_link()
 OPMODE="DEFAULT"
 
 # set options to accept
-readonly KNOWN_OPTIONS=":hv"
+readonly KNOWN_OPTIONS=":i"
 
 # check passed options
 while getopts "$KNOWN_OPTIONS" OPTION "$@"
@@ -202,12 +234,8 @@ do
 
   case "$OPTION" in
 
-    # show help
-    "h") OPMODE="SHOW_HELP"
-         ;;
-
-    # show version
-    "v") OPMODE="SHOW_VERSION"
+    # use current directory
+    "i") OPMODE="IN_PLACE"
          ;;
 
     "?") failmsg "unknown option: -$OPTARG"
@@ -225,15 +253,33 @@ done
 # get number of positional parameters
 PPNUM=$(( $# - OPTIND + 1 ))
 
-# drop all parsed options
-shift $(( OPTIND - 1 ))
+# check number of positional parameters
+if (( PPNUM > 0 )) ; then
+
+  # notify user
+  failmsg "no positional parameters allowed"
+
+  # signalize trouble
+  exit 1
+
+fi
 
 # ------------------------------------------------------------------------------
 # commands                                                              commands
 # ------------------------------------------------------------------------------
 
-# get output directory
-TARGETDIR=$(chronocfg -d 2>"/dev/null")
+# check flag
+if [ "$OPMODE" == "IN_PLACE" ] ; then
+
+  # use current directory
+  TARGETDIR="$PWD"
+
+else
+
+  # get output directory from config file
+  TARGETDIR=$(chronocfg -d 2>"/dev/null")
+
+fi
 
 # assert trailing slash
 TARGETDIR=$(sed -re "s|.+|&/| ; s|//$|/|" <<< "$TARGETDIR")
@@ -271,15 +317,6 @@ fi
 # set output filename
 readonly INDEXFILE="${TARGETDIR}index.html"
 
-# set sentinel filename
-readonly SENTINEL="$(chrononext "$TARGETDIR").body"
-
-# create sentinel as newest chrono file in this directory
-touch "$SENTINEL"
-
-# remove sentinel file on exit
-trap 'rm -f "$SENTINEL"' EXIT
-
 # redirect entire group
 {
 
@@ -295,29 +332,8 @@ trap 'rm -f "$SENTINEL"' EXIT
   # inside or outside <$LISTTAG> tag
   INSIDE=0
 
-  # find chrono files
-  find "$TARGETDIR"                            \
-       -type "f"                               \
-       -regextype "posix-extended"             \
-       -regex "[^$MYIFS]+/chrono-[^$MYIFS/]+$" \
-       -print0                                 \
-  | sort --zero-terminated                     \
-  | sed --quiet                                \
-        --null-data                            \
-        --regexp-extended                      \
-        --expression="
-
-          # replace last slash with MYIFS
-          s|(.+)/([^/]+)|\1$MYIFS\2| ; T
-
-          # replace last dot with MYIFS
-          s|(.+$MYIFS[^\.].*)\.([^\.]+)|\1$MYIFS\2| ; T
-
-          # print split filename
-          p
-
-        " \
-  | while IFS=$MYIFS read -r -d $'\0' DIR TTL EXT
+  # operate all chrono files
+  while IFS=$MYIFS read -rd $'\0' DIR TTL EXT
   do
 
     # list items
@@ -368,28 +384,19 @@ trap 'rm -f "$SENTINEL"' EXIT
         # show h1 tag
         show_tag "h1" "$DIR/$TTL.$EXT"
 
-      # sentinel found
-      elif [ "$EXT" == "body" ] ; then
-
-        # check list flag
-        if [ "$INSIDE" == "1" ] ; then
-
-          # close list
-          echo "</$LISTTAG>"
-
-          # update flag
-          INSIDE=0
-
-        fi
-
-        # stop reading more files
-        break
-
       fi
 
     fi
 
-  done
+  done < <(find_chrono_files "$TARGETDIR" "$MYIFS")
+
+  # check list flag
+  if [ "$INSIDE" == "1" ] ; then
+
+    # close list
+    echo "</$LISTTAG>"
+
+  fi
 
   # finish html file
   echo "</body>"
