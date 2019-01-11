@@ -441,8 +441,12 @@ if [ ! -s "$INDEXFILE" ] ; then
 
 fi
 
-# notify user
-donemsg "file created: $INDEXFILE"
+  # show created filename
+  donemsg "file created: $(basename "$INDEXFILE")"
+
+  # show created filename
+  chronosend "file created: $(basename "$INDEXFILE")"
+
 
 # signalize success
 exit 0

@@ -1,0 +1,37 @@
+#!/bin/bash
+
+# check number of arguments
+(( $# != 1 )) && exit 1
+
+# set message to show
+readonly MESSAGE="$1"
+
+# get icon to show via notify-send
+readonly ICON=$(chronocfg -i)
+
+# check if icon is given
+if [ -n "$ICON" ] ; then
+
+  # check if file is present
+  if [ -f "$ICON" ] ; then
+
+    # show notification
+    notify-send -u "normal" -i "$ICON" "$MESSAGE"
+
+  else
+
+    # show plain notification
+    notify-send -u "normal" "$MESSAGE"
+
+  fi
+
+else
+
+  # show plain notification
+  notify-send -u "normal" "$MESSAGE"
+
+fi
+
+# signalize success
+exit 0
+

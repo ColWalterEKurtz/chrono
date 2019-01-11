@@ -175,7 +175,10 @@ if [ -s "$OUTFILE" ] ; then
   fi
 
   # show created filename
-  donemsg "file created: $OUTFILE"
+  donemsg "file created: $(basename "$OUTFILE")"
+
+  # show created filename
+  chronosend "file created: $(basename "$OUTFILE")"
 
 else
 

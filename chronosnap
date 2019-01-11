@@ -174,9 +174,6 @@ if [ ! -d "$TARGETDIR" ] ; then
 
 fi
 
-# get icon to show via notify-send
-readonly ICON=$(chronocfg -i)
-
 # get final filename first (timestamp)
 readonly OUTFILE="$(chrononext "$TARGETDIR").png"
 
@@ -198,30 +195,10 @@ fi
 mv --force "$TEMPFILE" "$OUTFILE"
 
 # show created filename
-donemsg "file created: $OUTFILE"
+donemsg "file created: $(basename "$OUTFILE")"
 
-# check if icon is given
-if [ -n "$ICON" ] ; then
-
-  # check if file is present
-  if [ -f "$ICON" ] ; then
-
-    # show notification
-    notify-send -u "normal" -i "$ICON" "file created: $(basename "$OUTFILE")"
-
-  else
-
-    # show plain notification
-    notify-send -u "normal" "file created: $(basename "$OUTFILE")"
-
-  fi
-
-else
-
-  # show plain notification
-  notify-send -u "normal" "file created: $(basename "$OUTFILE")"
-
-fi
+# show created filename
+chronosend "file created: $(basename "$OUTFILE")"
 
 # signalize success
 exit 0
