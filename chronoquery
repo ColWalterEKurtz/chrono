@@ -141,10 +141,48 @@ function setup_window()
 }
 
 # ------------------------------------------------------------------------------
+# options                                                                options
+# ------------------------------------------------------------------------------
+
+# set default values
+OPMODE="SIMPLIFY"
+
+# set options to accept
+readonly KNOWN_OPTIONS=":v"
+
+# check passed options
+while getopts "$KNOWN_OPTIONS" OPTION "$@"
+do
+
+  case "$OPTION" in
+
+    # don't simplify user input
+    "v") OPMODE="VERBATIM"
+         ;;
+
+    "?") failmsg "unknown option: -$OPTARG"
+         exit 1
+         ;;
+
+    ":") failmsg "missing argument: -$OPTARG <argument>"
+         exit 1
+         ;;
+
+  esac
+
+done
+
+# get number of positional parameters
+PPNUM=$(( $# - OPTIND + 1 ))
+
+# drop all parsed options
+shift $(( OPTIND - 1 ))
+
+# ------------------------------------------------------------------------------
 # commands                                                              commands
 # ------------------------------------------------------------------------------
 
-# check number of arguments
+# check number of (remaining) arguments
 (( $# != 1 )) && exit 1
 
 # set filename
@@ -186,22 +224,27 @@ setup_window "$EDITORID" "$EDTX" "$EDTY" "$EDTW" "$EDTH" "1"
 # wait for editor to terminate
 wait "$EDITORID"
 
-# reduce white space
-sed --in-place        \
-    --regexp-extended \
-    --expression="
+# check flag
+if [ "$OPMODE" == "SIMPLIFY" ] ; then
 
-      # skip empty lines
-      /^[[:space:]]*$/ d
+  # reduce white space
+  sed --in-place        \
+      --regexp-extended \
+      --expression="
 
-      # squeeze and unify white space
-      s/[[:space:]]+/ /g
+        # skip empty lines
+        /^[[:space:]]*$/ d
 
-      # trim lines
-      s/^ //
-      s/ $//
+        # squeeze and unify white space
+        s/[[:space:]]+/ /g
 
-    " "$OUTFILE"
+        # trim lines
+        s/^ //
+        s/ $//
+
+      " "$OUTFILE"
+
+fi
 
 # signalize success
 exit 0

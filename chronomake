@@ -217,27 +217,6 @@ function show_link()
       " "$1"
 }
 
-# ---------
-# show_code
-# ---------
-#
-# $1  filename
-#
-function show_code()
-{
-  sed --regexp-extended \
-      --expression="
-
-        # skip empty lines
-        /^[[:space:]]*$/ d
-
-        # remove leading and trailing space
-        #s/^[[:space:]]+//
-        #s/[[:space:]]+$//
-
-      " "$1"
-}
-
 # ------------------------------------------------------------------------------
 # options                                                                options
 # ------------------------------------------------------------------------------
@@ -408,7 +387,7 @@ readonly INDEXFILE="${TARGETDIR}index.html"
       elif [ "$EXT" == "code" ] ; then
 
         # show html code
-        show_code "$DIR/$TTL.$EXT"
+        cat "$DIR/$TTL.$EXT"
 
       fi
 
