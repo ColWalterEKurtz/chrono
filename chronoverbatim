@@ -149,8 +149,8 @@ fi
 # get final filename first (timestamp)
 readonly OUTFILE="$(chrononext "$TARGETDIR").code"
 
-# insert some empty lines
-echo -e "\n\n\n" > "$OUTFILE"
+# create empty file
+touch "$OUTFILE"
 
 # query user
 if ! chronoquery -v "$OUTFILE" ; then
